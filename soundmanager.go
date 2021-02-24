@@ -61,6 +61,12 @@ func (gD *GameDisplay) playSound(playerpos, soundpos int) {
 	gD.audio.players[playerpos].Play()
 }
 
+func (gD *GameDisplay) initSound() {
+	soundBytes := sounds[0][2]
+	player := audio.NewPlayerFromBytes(gD.audio.context, soundBytes)
+	player.Play()
+}
+
 func initAudio() soundManager {
 	context := audio.NewContext(44100)
 

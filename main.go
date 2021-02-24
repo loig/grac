@@ -45,10 +45,22 @@ const (
 	stateRunAutomaton
 )
 
+func (gD *GameDisplay) initUpdate() bool {
+	gD.frame++
+	if gD.frame >= 6 {
+		gD.initSound()
+		gD.frame = 0
+		return true
+	}
+	return false
+}
+
 func (gD *GameDisplay) Update() error {
 	switch gD.state {
 	case stateInit:
-		gD.state++
+		if gD.initUpdate() {
+			gD.state++
+		}
 	case stateChooseTempo:
 		if gD.chooseTempoUpdate() {
 			gD.state++
@@ -72,6 +84,8 @@ func (gD *GameDisplay) Update() error {
 	case stateChooseInitial:
 		if gD.chooseInitialGridUpdate() {
 			gD.automaton.init()
+			gD.playSounds()
+			gD.frame = 0
 			gD.state++
 		}
 	case stateRunAutomaton:
