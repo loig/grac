@@ -92,7 +92,7 @@ func (gD *GameDisplay) chooseRulesUpdate() bool {
 		}
 	case inpututil.IsKeyJustPressed(ebiten.KeySpace):
 		gD.automaton.rules[currentRule] = (gD.automaton.rules[currentRule] + 1) % gD.automaton.numVal
-	case inpututil.IsKeyJustPressed(ebiten.KeyEnter):
+	case inpututil.IsKeyJustPressed(ebiten.KeyShift):
 		return true
 	}
 	return false

@@ -32,6 +32,7 @@ type GameDisplay struct {
 	tempoPos  int
 	frame     int
 	fresh     bool
+	part      bool
 	audio     soundManager
 }
 
@@ -56,6 +57,9 @@ func (gD *GameDisplay) initUpdate() bool {
 }
 
 func (gD *GameDisplay) Update() error {
+	if inpututil.IsKeyJustPressed(ebiten.KeyTab) {
+		gD.part = !gD.part
+	}
 	switch gD.state {
 	case stateInit:
 		if gD.initUpdate() {
@@ -67,27 +71,35 @@ func (gD *GameDisplay) Update() error {
 		}
 	case stateChooseSize:
 		if gD.chooseSizeUpdate() {
-			gD.automaton.genGrid(gD.fresh)
 			gD.state++
 		}
+		gD.automaton.genGrid(gD.fresh)
 	case stateChooseNumVal:
 		if gD.chooseNumValUpdate() {
-			gD.automaton.genBasicRules(gD.fresh)
 			currentRule = 0
 			gD.state++
 		}
+		gD.automaton.genBasicRules(gD.fresh)
 	case stateChooseRules:
 		if gD.chooseRulesUpdate() {
 			currentCell = 0
 			gD.state++
-		}
-	case stateChooseInitial:
-		if gD.chooseInitialGridUpdate() {
+		} else if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
 			gD.automaton.init()
 			gD.playSounds()
 			gD.frame = 0
-			gD.state++
+			gD.state += 2
 		}
+		gD.automaton.init()
+	case stateChooseInitial:
+		if gD.chooseInitialGridUpdate() {
+			gD.playSounds()
+			gD.frame = 0
+			gD.state++
+		} else if inpututil.IsKeyJustPressed(ebiten.KeyShift) {
+			gD.state--
+		}
+		gD.automaton.init()
 	case stateRunAutomaton:
 		gD.frame++
 		if 3600/tempos[gD.tempoPos] <= gD.frame {
@@ -97,6 +109,7 @@ func (gD *GameDisplay) Update() error {
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
 			gD.fresh = false
+			gD.automaton.genGrid(gD.fresh)
 			gD.state = stateChooseTempo
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
@@ -125,52 +138,79 @@ func (gD *GameDisplay) Draw(screen *ebiten.Image) {
 	if gD.state >= stateChooseTempo {
 		ebitenutil.DebugPrintAt(screen, fmt.Sprint("Tempo : ", tempos[gD.tempoPos]), 10, 10)
 		if gD.state == stateChooseTempo {
-			ebitenutil.DebugPrintAt(screen, "Réglage du tempo, utiliser les flèches pour le faire varier et entrée pour valider.", 10, 575)
+			ebitenutil.DebugPrintAt(screen, "Réglage du tempo", 10, 490)
+			ebitenutil.DebugPrintAt(screen, "   Flèches : faire varier le tempo", 10, 505)
+			ebitenutil.DebugPrintAt(screen, "   Entrée : valider le tempo", 10, 520)
 		}
 	}
 
 	if gD.state >= stateChooseSize || !gD.fresh {
-		ebitenutil.DebugPrintAt(screen, fmt.Sprint("Nombre de cellules : ", gD.automaton.size), 10, 30)
+		ebitenutil.DebugPrintAt(screen, fmt.Sprint("Nombre de cellules : ", gD.automaton.size), 10, 25)
 		if gD.state == stateChooseSize {
-			ebitenutil.DebugPrintAt(screen, "Réglage du nombre de cellules, utiliser les flèches pour le faire varier et entrée pour valider.", 10, 575)
+			ebitenutil.DebugPrintAt(screen, "Réglage du nombre de cellules", 10, 490)
+			ebitenutil.DebugPrintAt(screen, "   Flèches : faire varier le nombre de cellules", 10, 505)
+			ebitenutil.DebugPrintAt(screen, "   Entrée : valider le nombre de cellules", 10, 520)
 		}
 	}
 
 	if gD.state >= stateChooseNumVal || !gD.fresh {
-		ebitenutil.DebugPrintAt(screen, fmt.Sprint("Nombre d'états par cellule : ", gD.automaton.numVal), 10, 50)
+		ebitenutil.DebugPrintAt(screen, fmt.Sprint("Nombre d'états par cellule : ", gD.automaton.numVal), 10, 40)
 		if gD.state == stateChooseNumVal {
-			ebitenutil.DebugPrintAt(screen, "Réglage du nombre d'états possibles pour chaque cellule, utiliser les flèches pour le faire varier et entrée pour valider.", 10, 575)
+			ebitenutil.DebugPrintAt(screen, "Réglage du nombre d'états possibles pour chaque cellule", 10, 490)
+			ebitenutil.DebugPrintAt(screen, "   Flèches : faire varier le nombre d'états", 10, 505)
+			ebitenutil.DebugPrintAt(screen, "   Entrée : valider le nombre d'états", 10, 520)
 		}
 	}
 
-	if gD.state >= stateChooseRules || !gD.fresh {
-		ebitenutil.DebugPrintAt(screen, "Règles : ", 10, 70)
+	if gD.state >= stateChooseNumVal || !gD.fresh {
+		ebitenutil.DebugPrintAt(screen, "Règles : ", 10, 55)
 		if gD.state == stateChooseRules {
-			gD.automaton.drawRules(screen, 20, 100, true)
-			ebitenutil.DebugPrintAt(screen, "Choix des règles, utiliser les flèches pour sélectionner une règle, espace pour changer son résultat.", 10, 565)
-			ebitenutil.DebugPrintAt(screen, "Quand toutes les règles sont fixées, appuyer sur entrée pour valider.", 10, 575)
+			gD.automaton.drawRules(screen, 20, 75, true)
+			ebitenutil.DebugPrintAt(screen, "Choix des règles", 10, 490)
+			ebitenutil.DebugPrintAt(screen, "   Flèches : sélectionner une règle", 10, 505)
+			ebitenutil.DebugPrintAt(screen, "   Espace : changer la règle sélectionnée", 10, 520)
+			ebitenutil.DebugPrintAt(screen, "   Majuscule : passer au choix de l'état initial", 10, 535)
+			ebitenutil.DebugPrintAt(screen, "   Entrée : lancer la simulation", 10, 550)
 		} else {
-			gD.automaton.drawRules(screen, 20, 100, false)
+			gD.automaton.drawRules(screen, 20, 75, false)
 		}
 	}
 
-	if gD.state == stateChooseInitial {
-		gD.automaton.draw(screen, 700, 300, true)
+	if gD.state != stateRunAutomaton && (gD.state >= stateChooseSize || !gD.fresh) {
+		if gD.part {
+			gD.automaton.drawPart(screen, 350+(globalMaxSize-len(gD.automaton.grid))*8, 20, gD.state == stateChooseInitial, !gD.fresh || gD.state >= stateChooseRules)
+		} else {
+			gD.automaton.draw(screen, 700, 300, gD.state == stateChooseInitial, !gD.fresh || gD.state >= stateChooseRules)
+		}
 		if gD.state == stateChooseInitial {
-			ebitenutil.DebugPrintAt(screen, "Choix de l'état initial des cellules, utiliser les flèches (gauche, droite) pour sélectionner une cellule, espace pour changer son état.", 10, 565)
-			ebitenutil.DebugPrintAt(screen, "Quand l'état initial de toutes les cellules est fixé, appuyer sur entrée pour valider.", 10, 575)
+			ebitenutil.DebugPrintAt(screen, "Choix de l'état initial des cellules", 10, 490)
+			ebitenutil.DebugPrintAt(screen, "   Flèches (gauche, droite) : sélectionner une cellule", 10, 505)
+			ebitenutil.DebugPrintAt(screen, "   Espace : changer l'état de la cellule sélectionnée", 10, 520)
+			ebitenutil.DebugPrintAt(screen, "   Majuscule : passer au choix des règles", 10, 535)
+			ebitenutil.DebugPrintAt(screen, "   Entrée : lancer la simulation", 10, 550)
 		}
 	}
 
 	if gD.state == stateRunAutomaton {
-		gD.automaton.draw(screen, 700, 300, false)
-		ebitenutil.DebugPrintAt(screen, fmt.Sprint("Génération actuelle : ", gD.automaton.generation), 10, (len(gD.automaton.rules)+7)/8*26+110)
-		ebitenutil.DebugPrintAt(screen, "La simulation tourne. Utiliser entrée pour recommencer avec de nouveaux paramètres.", 10, 565)
-		if ebiten.IsFullscreen() {
-			ebitenutil.DebugPrintAt(screen, "Utiliser espace pour changer le jeu de sons. Utiliser échape pour quitter le mode plein écran.", 10, 575)
+		if gD.part {
+			gD.automaton.drawPart(screen, 350+(globalMaxSize-len(gD.automaton.grid))*8, 20, false, true)
 		} else {
-			ebitenutil.DebugPrintAt(screen, "Utiliser espace pour changer le jeu de sons. Utiliser échape pour quitter le logiciel.", 10, 575)
+			gD.automaton.draw(screen, 700, 300, false, true)
 		}
+		ebitenutil.DebugPrintAt(screen, fmt.Sprint("Simulation en cours (génération ", gD.automaton.generation, ")"), 10, 490)
+		ebitenutil.DebugPrintAt(screen, "   Entrée : recommencer avec de nouveaux paramètres", 10, 505)
+		ebitenutil.DebugPrintAt(screen, "   Espace : changer le jeu de sons", 10, 520)
+	}
+
+	if gD.part {
+		ebitenutil.DebugPrintAt(screen, "   Tabulation : passer en mode visualisation", 10, 565)
+	} else {
+		ebitenutil.DebugPrintAt(screen, "   Tabulation : passer en mode partition", 10, 565)
+	}
+	if ebiten.IsFullscreen() {
+		ebitenutil.DebugPrintAt(screen, "   Echape : quitter le mode plein écran", 10, 580)
+	} else {
+		ebitenutil.DebugPrintAt(screen, "   Echape : quitter le logiciel", 10, 580)
 	}
 }
 

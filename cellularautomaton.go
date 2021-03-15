@@ -110,22 +110,83 @@ func (cA *CelAut) getNextGrid() {
 	}
 }
 
-func (cA *CelAut) draw(screen *ebiten.Image, x, y int, drawCursor bool) {
+func (cA *CelAut) draw(screen *ebiten.Image, x, y int, drawCursor bool, drawFuturAndPast bool) {
 	radius := float64(7 * len(cA.grid))
 	xCenter := float64(x)
 	yCenter := float64(y)
 	for i := 0; i < len(cA.grid); i++ {
 		cellX := xCenter + radius*math.Cos(2*math.Pi*float64(i)/float64(len(cA.grid)))
 		cellY := yCenter + radius*math.Sin(2*math.Pi*float64(i)/float64(len(cA.grid)))
-		cA.drawCell(i, screen, cellX, cellY, !drawCursor, i == currentCell)
+		cA.drawCell(i, screen, cellX, cellY, drawFuturAndPast, (i == currentCell) && drawCursor)
 	}
+}
+
+func (cA *CelAut) drawPart(screen *ebiten.Image, x, y int, drawCursor bool, drawFuturAndPast bool) {
+
+	lineSize := 16
+	numLines := 36
+
+	if drawFuturAndPast {
+		if len(cA.lastGrid) > 0 {
+			cA.drawLine(screen, x, y, false, cA.lastGrid, false)
+		}
+	}
+
+	cA.drawLine(screen, x, y+lineSize, drawCursor, cA.grid, true)
+
+	if drawFuturAndPast {
+		grid := make([]int, len(cA.grid))
+		for i := range grid {
+			grid[i] = cA.grid[i]
+		}
+
+		for i := 0; i < numLines-2; i++ {
+			nextGrid := make([]int, len(grid))
+			for i := range nextGrid {
+				left := (i - 1 + len(nextGrid)) % len(grid)
+				mid := i
+				right := (i + 1) % len(grid)
+				ruleNum := grid[left]*cA.numVal*cA.numVal + grid[mid]*cA.numVal + grid[right]
+				nextGrid[i] = cA.rules[ruleNum]
+			}
+			grid = nextGrid
+			cA.drawLine(screen, x, y+(i+2)*lineSize, false, grid, false)
+		}
+	}
+
+}
+
+func (cA *CelAut) drawLine(screen *ebiten.Image, x, y int, drawCursor bool, line []int, current bool) {
+
+	bigSize := 12
+	smallSize := 8
+	colSize := 16
+	cursorSize := 14
+
+	for i := range line {
+		if drawCursor && i == currentCell {
+			ebitenutil.DrawRect(screen, float64(x-cursorSize/2+i*colSize), float64(y-cursorSize/2), float64(cursorSize), float64(cursorSize), color.White)
+		}
+
+		colorPos := line[i]
+		if colorPos >= cA.numVal {
+			colorPos = 0
+		}
+		cellColor := stateColors[colorPos]
+		cellSize := smallSize
+		if current {
+			cellSize = bigSize
+		}
+		ebitenutil.DrawRect(screen, float64(x-cellSize/2+i*colSize), float64(y-cellSize/2), float64(cellSize), float64(cellSize), cellColor)
+	}
+
 }
 
 func (cA *CelAut) drawCell(pos int, screen *ebiten.Image, x, y float64, drawOther, drawCursor bool) {
 	smallSize := 5.0
 	bigSize := 20.0
 	cursorSize := 22.0
-	if drawCursor && !drawOther {
+	if drawCursor {
 		ebitenutil.DrawRect(screen, x-cursorSize/2, y-cursorSize/2, cursorSize, cursorSize, color.White)
 	}
 	colorPos := cA.grid[pos]
