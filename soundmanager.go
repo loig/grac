@@ -88,6 +88,6 @@ func initAudio() soundManager {
 	return soundManager{
 		context:  context,
 		soundset: 0,
-		use:      true,
+		use:      false,
 	}
 }

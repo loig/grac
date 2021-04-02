@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package main
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -72,6 +71,7 @@ func (gD *GameDisplay) Update() error {
 	case stateChooseSize:
 		if gD.chooseSizeUpdate() {
 			gD.state++
+			gD.automaton.keepOldRules = false
 		}
 		gD.automaton.genGrid(gD.fresh)
 	case stateChooseNumVal:
@@ -125,11 +125,7 @@ func (gD *GameDisplay) Update() error {
 	}
 
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
-		if ebiten.IsFullscreen() {
-			ebiten.SetFullscreen(false)
-		} else {
-			return errors.New("Finished")
-		}
+		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 	return nil
 }
@@ -178,9 +174,9 @@ func (gD *GameDisplay) Draw(screen *ebiten.Image) {
 
 	if gD.state != stateRunAutomaton && (gD.state >= stateChooseSize || !gD.fresh) {
 		if gD.part {
-			gD.automaton.drawPart(screen, 350+(globalMaxSize-len(gD.automaton.grid))*8, 20, gD.state == stateChooseInitial, !gD.fresh || gD.state >= stateChooseRules)
+			gD.automaton.drawPart(screen, 350+(globalMaxSize-len(gD.automaton.grid))*8, 20, gD.state == stateChooseInitial, gD.state >= stateChooseRules)
 		} else {
-			gD.automaton.draw(screen, 700, 300, gD.state == stateChooseInitial, !gD.fresh || gD.state >= stateChooseRules)
+			gD.automaton.draw(screen, 700, 300, gD.state == stateChooseInitial, gD.state >= stateChooseRules)
 		}
 		if gD.state == stateChooseInitial {
 			ebitenutil.DebugPrintAt(screen, "Choix de l'état initial des cellules", 10, 490)
@@ -199,7 +195,15 @@ func (gD *GameDisplay) Draw(screen *ebiten.Image) {
 		}
 		ebitenutil.DebugPrintAt(screen, fmt.Sprint("Simulation en cours (génération ", gD.automaton.generation, ")"), 10, 490)
 		ebitenutil.DebugPrintAt(screen, "   Entrée : recommencer avec de nouveaux paramètres", 10, 505)
-		ebitenutil.DebugPrintAt(screen, "   Espace : changer le jeu de sons", 10, 520)
+		if !gD.audio.use {
+			ebitenutil.DebugPrintAt(screen, "   Espace : utiliser des sons", 10, 520)
+		} else {
+			if gD.audio.soundset+1 == numSoundSet {
+				ebitenutil.DebugPrintAt(screen, "   Espace : couper les sons", 10, 520)
+			} else {
+				ebitenutil.DebugPrintAt(screen, "   Espace : changer le jeu de sons", 10, 520)
+			}
+		}
 	}
 
 	if gD.part {
@@ -210,7 +214,7 @@ func (gD *GameDisplay) Draw(screen *ebiten.Image) {
 	if ebiten.IsFullscreen() {
 		ebitenutil.DebugPrintAt(screen, "   Echape : quitter le mode plein écran", 10, 580)
 	} else {
-		ebitenutil.DebugPrintAt(screen, "   Echape : quitter le logiciel", 10, 580)
+		ebitenutil.DebugPrintAt(screen, "   Echape : passer en plein écran", 10, 580)
 	}
 }
 
@@ -229,7 +233,6 @@ func main() {
 	}
 
 	ebiten.SetWindowSize(1000, 600)
-	ebiten.SetFullscreen(true)
 	ebiten.SetWindowTitle("GRAC: Génération de Rythmes à l'aide d'Automates Cellulaires")
 
 	ebiten.RunGame(&gD)

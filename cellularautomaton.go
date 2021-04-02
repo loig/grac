@@ -27,51 +27,84 @@ import (
 )
 
 type CelAut struct {
-	size        int
-	numVal      int
-	initialGrid []int
-	lastGrid    []int
-	grid        []int
-	nextGrid    []int
-	rules       []int
-	generation  int
+	size          int
+	numVal        int
+	initialGrid   []int
+	lastGrid      []int
+	grid          []int
+	nextGrid      []int
+	score         [][]int
+	previousRules []int
+	keepOldRules  bool
+	rules         []int
+	generation    int
 }
 
 func initCellularAutomaton() CelAut {
-	return CelAut{
-		size:   25,
-		numVal: 2,
+	cA := CelAut{
+		size:        globalDefaultSize,
+		numVal:      globalDefaultNumVal,
+		initialGrid: make([]int, globalDefaultSize, globalMaxSize),
+		lastGrid:    make([]int, globalDefaultSize, globalMaxSize),
+		grid:        make([]int, globalDefaultSize, globalMaxSize),
+		nextGrid:    make([]int, globalDefaultSize, globalMaxSize),
+		score:       make([][]int, globalDisplayLine-1),
+		previousRules: make([]int,
+			globalDefaultNumVal*globalDefaultNumVal*globalDefaultNumVal, globalMaxNumVal*globalMaxNumVal*globalMaxNumVal),
+		rules: make([]int,
+			globalDefaultNumVal*globalDefaultNumVal*globalDefaultNumVal,
+			globalMaxNumVal*globalMaxNumVal*globalMaxNumVal),
 	}
+	for i := range cA.score {
+		cA.score[i] = make([]int, globalDefaultSize, globalMaxSize)
+	}
+	return cA
 }
 
 func (cA *CelAut) genGrid(fresh bool) {
 	if fresh || cA.size != len(cA.initialGrid) {
-		cA.initialGrid = make([]int, cA.size)
-		cA.grid = make([]int, cA.size)
-	} else {
-		copy(cA.grid, cA.initialGrid)
+		cA.initialGrid = cA.initialGrid[:cA.size]
+		cA.grid = cA.grid[:cA.size]
+		for i := range cA.score {
+			cA.score[i] = cA.score[i][:cA.size]
+		}
 	}
-	cA.lastGrid = make([]int, cA.size)
-	cA.nextGrid = make([]int, cA.size)
+	copy(cA.grid, cA.initialGrid)
+	cA.lastGrid = cA.lastGrid[:cA.size]
+	cA.nextGrid = cA.nextGrid[:cA.size]
+	for i := range cA.lastGrid {
+		cA.lastGrid[i] = 0
+		cA.nextGrid[i] = 0
+	}
+	for i := range cA.score {
+		for j := range cA.score[i] {
+			cA.score[i][j] = 0
+		}
+	}
 }
 
 func (cA *CelAut) genBasicRules(fresh bool) {
+	numRules := cA.numVal * cA.numVal * cA.numVal
 	if fresh {
-		cA.rules = make([]int, cA.numVal*cA.numVal*cA.numVal)
-	} else if cA.numVal*cA.numVal*cA.numVal != len(cA.rules) {
-		oldRules := cA.rules // copy?
+		cA.rules = cA.rules[:numRules]
+	} else if numRules != len(cA.rules) {
+		if !cA.keepOldRules {
+			cA.previousRules = cA.previousRules[:len(cA.rules)]
+			copy(cA.previousRules, cA.rules)
+			cA.keepOldRules = true
+		}
 		oldNumVal := 1
-		for oldNumVal*oldNumVal*oldNumVal != len(oldRules) {
+		for oldNumVal*oldNumVal*oldNumVal != len(cA.previousRules) {
 			oldNumVal++
 		}
-		cA.rules = make([]int, cA.numVal*cA.numVal*cA.numVal)
+		cA.rules = cA.rules[:numRules]
 		for i := 0; i < len(cA.rules); i++ {
 			left := i / (cA.numVal * cA.numVal)
 			mid := (i / cA.numVal) % cA.numVal
 			right := i % cA.numVal
 			if left < oldNumVal && mid < oldNumVal && right < oldNumVal {
 				oldPos := left*oldNumVal*oldNumVal + mid*oldNumVal + right
-				cA.rules[i] = oldRules[oldPos]
+				cA.rules[i] = cA.previousRules[oldPos]
 				if cA.rules[i] >= cA.numVal {
 					cA.rules[i] = 0
 				}
@@ -89,15 +122,15 @@ func (cA *CelAut) init() {
 		cA.grid[i] = cA.initialGrid[i]
 	}
 	cA.getNextGrid()
+	cA.getScore()
 }
 
 func (cA *CelAut) update() {
 	cA.generation++
-	for i := 0; i < len(cA.lastGrid); i++ {
-		cA.lastGrid[i] = cA.grid[i]
-		cA.grid[i] = cA.nextGrid[i]
-	}
+	copy(cA.lastGrid, cA.grid)
+	copy(cA.grid, cA.nextGrid)
 	cA.getNextGrid()
+	cA.updateScore()
 }
 
 func (cA *CelAut) getNextGrid() {
@@ -107,6 +140,35 @@ func (cA *CelAut) getNextGrid() {
 		right := (i + 1) % len(cA.grid)
 		ruleNum := cA.grid[left]*cA.numVal*cA.numVal + cA.grid[mid]*cA.numVal + cA.grid[right]
 		cA.nextGrid[i] = cA.rules[ruleNum]
+	}
+}
+
+func (cA *CelAut) getScore() {
+	copy(cA.score[0], cA.initialGrid)
+	for i := 1; i < len(cA.score); i++ {
+		for j := 0; j < len(cA.score[i]); j++ {
+			left := (j - 1 + len(cA.score[i])) % len(cA.score[i-1])
+			mid := j
+			right := (j + 1) % len(cA.score[i-1])
+			ruleNum := cA.score[i-1][left]*cA.numVal*cA.numVal + cA.score[i-1][mid]*cA.numVal + cA.score[i-1][right]
+			cA.score[i][j] = cA.rules[ruleNum]
+		}
+	}
+}
+
+func (cA *CelAut) updateScore() {
+	for i := 0; i < len(cA.score)-1; i++ {
+		for j := 0; j < len(cA.score[0]); j++ {
+			cA.score[i][j] = cA.score[i+1][j]
+		}
+	}
+	i := len(cA.score) - 1
+	for j := 0; j < len(cA.score[i]); j++ {
+		left := (j - 1 + len(cA.score[i])) % len(cA.score[i-1])
+		mid := j
+		right := (j + 1) % len(cA.score[i-1])
+		ruleNum := cA.score[i-1][left]*cA.numVal*cA.numVal + cA.score[i-1][mid]*cA.numVal + cA.score[i-1][right]
+		cA.score[i][j] = cA.rules[ruleNum]
 	}
 }
 
@@ -124,7 +186,7 @@ func (cA *CelAut) draw(screen *ebiten.Image, x, y int, drawCursor bool, drawFutu
 func (cA *CelAut) drawPart(screen *ebiten.Image, x, y int, drawCursor bool, drawFuturAndPast bool) {
 
 	lineSize := 16
-	numLines := 36
+	numLines := globalDisplayLine
 
 	if drawFuturAndPast {
 		if len(cA.lastGrid) > 0 {
@@ -135,22 +197,8 @@ func (cA *CelAut) drawPart(screen *ebiten.Image, x, y int, drawCursor bool, draw
 	cA.drawLine(screen, x, y+lineSize, drawCursor, cA.grid, true)
 
 	if drawFuturAndPast {
-		grid := make([]int, len(cA.grid))
-		for i := range grid {
-			grid[i] = cA.grid[i]
-		}
-
-		for i := 0; i < numLines-2; i++ {
-			nextGrid := make([]int, len(grid))
-			for i := range nextGrid {
-				left := (i - 1 + len(nextGrid)) % len(grid)
-				mid := i
-				right := (i + 1) % len(grid)
-				ruleNum := grid[left]*cA.numVal*cA.numVal + grid[mid]*cA.numVal + grid[right]
-				nextGrid[i] = cA.rules[ruleNum]
-			}
-			grid = nextGrid
-			cA.drawLine(screen, x, y+(i+2)*lineSize, false, grid, false)
+		for i := 1; i < numLines-1; i++ {
+			cA.drawLine(screen, x, y+(i+1)*lineSize, false, cA.score[i], false)
 		}
 	}
 

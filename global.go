@@ -23,11 +23,14 @@ import (
 )
 
 const (
-	globalMinSize   = 3
-	globalMaxSize   = 40
-	globalMinNumVal = 2
-	globalMaxNumVal = 5
-	numSoundSet     = 2
+	globalMinSize       = 3
+	globalDefaultSize   = 25
+	globalMaxSize       = 40
+	globalMinNumVal     = 2
+	globalDefaultNumVal = 2
+	globalMaxNumVal     = 5
+	globalDisplayLine   = 36
+	numSoundSet         = 2
 )
 
 var stateColors []color.Color = []color.Color{
