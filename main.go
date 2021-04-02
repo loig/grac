@@ -32,7 +32,6 @@ type GameDisplay struct {
 	frame     int
 	fresh     bool
 	part      bool
-	audio     soundManager
 }
 
 const (
@@ -48,7 +47,6 @@ const (
 func (gD *GameDisplay) initUpdate() bool {
 	gD.frame++
 	if gD.frame >= 6 {
-		gD.initSound()
 		gD.frame = 0
 		return true
 	}
@@ -86,14 +84,12 @@ func (gD *GameDisplay) Update() error {
 			gD.state++
 		} else if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
 			gD.automaton.init()
-			gD.playSounds()
 			gD.frame = 0
 			gD.state += 2
 		}
 		gD.automaton.init()
 	case stateChooseInitial:
 		if gD.chooseInitialGridUpdate() {
-			gD.playSounds()
 			gD.frame = 0
 			gD.state++
 		} else if inpututil.IsKeyJustPressed(ebiten.KeyShift) {
@@ -104,7 +100,6 @@ func (gD *GameDisplay) Update() error {
 		gD.frame++
 		if 3600/tempos[gD.tempoPos] <= gD.frame {
 			gD.automaton.update()
-			gD.playSounds()
 			gD.frame = 0
 		}
 		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
@@ -112,20 +107,6 @@ func (gD *GameDisplay) Update() error {
 			gD.automaton.genGrid(gD.fresh)
 			gD.state = stateChooseTempo
 		}
-		if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
-			if !gD.audio.use {
-				gD.audio.use = true
-			} else {
-				gD.audio.soundset = (gD.audio.soundset + 1) % numSoundSet
-				if gD.audio.soundset == 0 {
-					gD.audio.use = false
-				}
-			}
-		}
-	}
-
-	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
 	return nil
 }
@@ -195,26 +176,12 @@ func (gD *GameDisplay) Draw(screen *ebiten.Image) {
 		}
 		ebitenutil.DebugPrintAt(screen, fmt.Sprint("Simulation en cours (génération ", gD.automaton.generation, ")"), 10, 490)
 		ebitenutil.DebugPrintAt(screen, "   Entrée : recommencer avec de nouveaux paramètres", 10, 505)
-		if !gD.audio.use {
-			ebitenutil.DebugPrintAt(screen, "   Espace : utiliser des sons", 10, 520)
-		} else {
-			if gD.audio.soundset+1 == numSoundSet {
-				ebitenutil.DebugPrintAt(screen, "   Espace : couper les sons", 10, 520)
-			} else {
-				ebitenutil.DebugPrintAt(screen, "   Espace : changer le jeu de sons", 10, 520)
-			}
-		}
 	}
 
 	if gD.part {
 		ebitenutil.DebugPrintAt(screen, "   Tabulation : passer en mode visualisation", 10, 565)
 	} else {
 		ebitenutil.DebugPrintAt(screen, "   Tabulation : passer en mode partition", 10, 565)
-	}
-	if ebiten.IsFullscreen() {
-		ebitenutil.DebugPrintAt(screen, "   Echape : quitter le mode plein écran", 10, 580)
-	} else {
-		ebitenutil.DebugPrintAt(screen, "   Echape : passer en plein écran", 10, 580)
 	}
 }
 
@@ -229,7 +196,6 @@ func main() {
 		automaton: initCellularAutomaton(),
 		tempoPos:  25,
 		fresh:     true,
-		audio:     initAudio(),
 	}
 
 	ebiten.SetWindowSize(1000, 600)
